@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>About Page with Starfield and Q&A</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        overflow-x: hidden;
+        background-color: black;
+        color: white;
+        font-family: monospace, monospace;
+        scroll-behavior: smooth;
+      }
+
+      #dot-container {
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        cursor: pointer;
+        position: relative;
+        z-index: 5;
+      }
+
+      #dot {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background-color: white;
+        box-shadow: 0 0 10px 5px white;
+        animation: pulse 1s infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          box-shadow: 0 0 10px 5px white;
+        }
+        50% {
+          box-shadow: 0 0 20px 10px white;
+        }
+      }
+
+      #starfield {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        z-index: 1;
+        display: none;
+        background: black;
+      }
+
+      /* Container to stack question and answer vertically */
+      #qa-container {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: center; /* vertical center */
+        align-items: center; /* horizontal center */
+        gap: 4rem; /* spacing between question and answer */
+        padding: 0 2rem;
+      }
+
+      #question,
+      #answer {
+        max-width: 90vw;
+        white-space: nowrap;
+        overflow: hidden;
+        font-size: 3rem;
+      }
+
+      #answer {
+        font-size: 2rem;
+        opacity: 0;
+        transition: opacity 1s ease;
+      }
+
+      #answer.visible {
+        opacity: 1;
+      }
+
+      /* Typing caret on span inside question and answer */
+      .typing span {
+        border-right: 3px solid white;
+        animation: blink-caret 0.75s step-end infinite;
+        white-space: nowrap;
+      }
+
+      @keyframes blink-caret {
+        50% {
+          border-color: transparent;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="dot-container" title="Click the white dot">
+      <div id="dot"></div>
+    </div>
+
+    <canvas id="starfield"></canvas>
+
+    <!-- Container holding question and answer sections -->
+    <div id="qa-container" style="display: none">
+      <section id="question"><span></span></section>
+      <section id="answer"><span></span></section>
+    </div>
+
+    <audio
+      id="beep"
+      src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"
+      preload="auto"
+    ></audio>
+
+    <script>
+      const dotContainer = document.getElementById("dot-container");
+      const beep = document.getElementById("beep");
+      const starfieldCanvas = document.getElementById("starfield");
+      const qaContainer = document.getElementById("qa-container");
+      const questionSection = document.getElementById("question");
+      const answerSection = document.getElementById("answer");
+      const questionSpan = questionSection.querySelector("span");
+      const answerSpan = answerSection.querySelector("span");
+
+      const questionText = "Question 1";
+      const answerText = "This is the answer to Question 1.";
+
+      // Play beep sound loop
+      beep.loop = true;
+      beep.volume = 0.3;
+      beep.play().catch(() => {
+        // Autoplay might be blocked, will play on interaction
+      });
+
+      // Starfield setup
+      const ctx = starfieldCanvas.getContext("2d");
+      let width, height;
+      let stars = [];
+      const starsCount = 300;
+
+      class Star {
+        constructor() {
+          this.reset();
+        }
+        reset() {
+          this.x = Math.random() * width;
+          this.y = Math.random() * height;
+          this.z = Math.random() * width;
+          this.px = this.x;
+          this.py = this.y;
+        }
+        update() {
+          this.z -= 10;
+          if (this.z <= 0) {
+            this.reset();
+            this.z = width;
+          }
+          this.px = this.x;
+          this.py = this.y;
+          this.x = (this.x - width / 2) * (width / this.z) + width / 2;
+          this.y = (this.y - height / 2) * (width / this.z) + height / 2;
+        }
+        draw() {
+          ctx.strokeStyle = "white";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(this.px, this.py);
+          ctx.lineTo(this.x, this.y);
+          ctx.stroke();
+        }
+      }
+
+      function resize() {
+        width = window.innerWidth;
+        height = window.innerHeight;
+        starfieldCanvas.width = width;
+        starfieldCanvas.height = height;
+      }
+
+      function initStars() {
+        stars = [];
+        for (let i = 0; i < starsCount; i++) {
+          stars.push(new Star());
+        }
+      }
+
+      let animationRunning = false;
+
+      function animate() {
+        ctx.fillStyle = "black";
+        ctx.fillRect(0, 0, width, height);
+        stars.forEach((star) => {
+          star.update();
+          star.draw();
+        });
+        if (animationRunning) {
+          requestAnimationFrame(animate);
+        }
+      }
+
+      // Typewriter effect function targeting the <span>
+      function typeWriter(element, text, callback) {
+        element.textContent = "";
+        element.parentElement.style.display = "flex";
+        element.classList.add("typing"); // add typing caret
+
+        let i = 0;
+        function typing() {
+          if (i < text.length) {
+            element.textContent += text.charAt(i);
+            i++;
+            setTimeout(typing, 80);
+          } else {
+            element.classList.remove("typing"); // remove caret after done
+            if (callback) callback();
+          }
+        }
+        typing();
+      }
+
+      dotContainer.addEventListener("click", () => {
+        // Stop beep sound
+        beep.pause();
+        beep.currentTime = 0;
+
+        // Hide dot container
+        dotContainer.style.display = "none";
+
+        // Show starfield canvas and start animation
+        starfieldCanvas.style.display = "block";
+        resize();
+        initStars();
+        animationRunning = true;
+        animate();
+
+        // After 1.5 seconds stop animation and show Q&A container with question typing
+        setTimeout(() => {
+          animationRunning = false;
+          starfieldCanvas.style.display = "none";
+          qaContainer.style.display = "flex";
+          typeWriter(questionSpan, questionText);
+        }, 1500);
+      });
+
+      window.addEventListener("resize", () => {
+        if (animationRunning) {
+          resize();
+        }
+      });
+
+      let answerTyped = false;
+
+      window.addEventListener("scroll", () => {
+        if (answerTyped) return; // prevent multiple triggers
+
+        const answerTop = answerSection.getBoundingClientRect().top;
+        const windowHeight = window.innerHeight;
+
+        // Trigger answer typing when answer scrolls near bottom of viewport (user scrolled down)
+        if (answerTop < windowHeight * 0.9) {
+          answerTyped = true;
+          typeWriter(answerSpan, answerText, () => {
+            answerSection.classList.add("visible");
+          });
+        }
+      });
+
+      // Initially hide question and answer spans
+      questionSection.style.display = "none";
+      answerSection.style.display = "none";
+    </script>
+  </body>
+</html>
